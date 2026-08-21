@@ -4,13 +4,12 @@ FROM python:3.11-slim-bullseye
 # Set the working directory in the container
 WORKDIR /MoneyPrinterTurbo
 
-# 设置/MoneyPrinterTurbo目录权限为777
+# Set directory permissions
 RUN chmod 777 /MoneyPrinterTurbo
 
 ENV PYTHONPATH="/MoneyPrinterTurbo"
 
-# 本地用户默认继续优先使用国内镜像；GitHub Actions 发布 GHCR 镜像时使用 default，
-# 避免海外 runner 访问国内镜像过慢导致镜像发布长时间卡住。
+# Build mirror configuration
 ARG DOCKER_BUILD_MIRROR=china
 ARG PIP_USE_OFFICIAL=0
 
@@ -50,10 +49,10 @@ RUN if [ "$DOCKER_BUILD_MIRROR" = "china" ]; then \
         done \
     ) && rm -rf /var/lib/apt/lists/*
 
-# Copy only the requirements.txt first to leverage Docker cache
+# Copy requirements first for Docker cache
 COPY requirements.txt ./
 
-# 本地默认优先国内 PyPI 镜像；GHCR 发布使用官方 PyPI，避免海外 runner 因跨境镜像访问变慢。
+# Install Python dependencies
 RUN if [ "$PIP_USE_OFFICIAL" = "1" ]; then \
         pip install --no-cache-dir --retries 3 --timeout 60 -r requirements.txt; \
     else \
@@ -62,21 +61,11 @@ RUN if [ "$PIP_USE_OFFICIAL" = "1" ]; then \
         pip install --no-cache-dir --retries 3 --timeout 60 -r requirements.txt; \
     fi
 
-# Now copy the rest of the codebase into the image
+# Copy application
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 8501
+# Render uses port 10000
+EXPOSE 10000
 
-# 容器内部必须监听 0.0.0.0，宿主机仍通过 docker 端口映射限制为 127.0.0.1。
-# browser.serverAddress 只决定浏览器展示的访问地址，不能替代 server.address。
-CMD ["streamlit", "run", "./webui/Main.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.serverAddress=127.0.0.1", "--server.enableCORS=True", "--browser.gatherUsageStats=False", "--client.toolbarMode=minimal", "--logger.hideWelcomeMessage=True", "--server.showEmailPrompt=False"]
-
-# 1. Build the Docker image using the following command
-# docker build -t moneyprinterturbo .
-
-# 2. Run the Docker container using the following command
-## For Linux or MacOS:
-# docker run -v $(pwd)/config.toml:/MoneyPrinterTurbo/config.toml -v $(pwd)/storage:/MoneyPrinterTurbo/storage -p 127.0.0.1:8501:8501 moneyprinterturbo
-## For Windows:
-# docker run -v ${PWD}/config.toml:/MoneyPrinterTurbo/config.toml -v ${PWD}/storage:/MoneyPrinterTurbo/storage -p 127.0.0.1:8501:8501 moneyprinterturbo
+# Start Streamlit
+CMD ["streamlit", "run", "./webui/Main.py", "--server.address=0.0.0.0", "--server.port=10000", "--browser.serverAddress=0.0.0.0", "--server.enableCORS=True", "--browser.gatherUsageStats=False", "--client.toolbarMode=minimal", "--logger.hideWelcomeMessage=True", "--server.showEmailPrompt=False"]
